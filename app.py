@@ -2,59 +2,43 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-import numpy as np
 
-st.set_page_config(page_title="BTC PRO", layout="wide")
-st.title("📈 Прогноз BTC (TFT + MVRV)")
+st.set_page_config(page_title="BTC Monitor", layout="wide")
+st.title("📊 Мониторинг BTC (Данные Yahoo Finance)")
 
-# 1. Загружаем данные (берем чуть больше истории для наглядности)
+# 1. Загрузка реальных данных
 @st.cache_data
-def load_data():
-    df = yf.download('BTC-USD', start='2024-01-01')
+def get_data():
+    # Берем данные за последние полгода
+    df = yf.download('BTC-USD', period='6mo', interval='1d')
     return df
 
 try:
-    df = load_data()
+    df = get_data()
     last_price = float(df['Close'].iloc[-1])
     
-    # 2. Генерируем прогноз на 30 дней
-    future_days = 30
-    last_date = df.index[-1]
-    forecast_dates = [last_date + timedelta(days=i) for i in range(1, future_days + 1)]
-    
-    # Симуляция на основе весов
-    np.random.seed(42)
-    changes = np.random.normal(0.001, 0.02, future_days)
-    forecast_prices = last_price * (1 + changes).cumsum()
+    # 2. Считаем простой скользящий тренд (SMA 20) - это честнее, чем рандом
+    df['SMA20'] = df['Close'].rolling(window=20).mean()
 
-    # 3. РИСУЕМ ГРАФИК (Железно работающий метод)
+    # 3. Рисуем график
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # Рисуем историю (последние 90 дней)
-    history = df.tail(90)
-    ax.plot(history.index, history['Close'], label='История (Yahoo Finance)', color='#1f77b4', lw=2)
+    # Реальная цена
+    ax.plot(df.index, df['Close'], label='Цена BTC (USD)', color='#1f77b4', lw=2)
     
-    # Рисуем прогноз (стыкуем с последней ценой)
-    ax.plot([last_date] + forecast_dates, [last_price] + list(forecast_prices), 
-            label='Прогноз нейросети', color='#ff7f0e', lw=3, linestyle='--')
-    
-    # Добавляем "облако"
-    ax.fill_between(forecast_dates, forecast_prices * 0.9, forecast_prices * 1.1, 
-                    color='#ff7f0e', alpha=0.2, label='Зона риска')
+    # Линия тренда (вместо безумного прогноза)
+    ax.plot(df.index, df['SMA20'], label='Линия тренда (SMA 20)', color='#ff7f0e', linestyle='--')
 
-    # Настройка осей, чтобы не было пустоты
-    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.set_title(f"Текущий курс: ${last_price:,.2f}", fontsize=16)
+    ax.grid(True, alpha=0.3)
     ax.legend()
-    ax.set_ylabel('Цена в USD')
     
-    # Показываем в Streamlit
+    # Устанавливаем нормальный масштаб (не в миллионах!)
+    ax.set_ylim(df['Close'].min() * 0.9, df['Close'].max() * 1.1)
+
     st.pyplot(fig)
     
-    # Текстовые выводы под графиком
-    col1, col2 = st.columns(2)
-    col1.metric("Текущая цена", f"${last_price:,.2f}")
-    col2.metric("Цель через 30 дней", f"${forecast_prices[-1]:,.2f}")
+    st.write("Прогноз на 30 дней временно отключен, чтобы не выдавать ошибки. Сейчас на графике — реальный рыночный тренд.")
 
 except Exception as e:
-    st.error(f"Ошибка: {e}")
+    st.error(f"Ошибка загрузки данных: {e}")
