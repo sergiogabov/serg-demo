@@ -1,0 +1,7 @@
+streamlit
+pandas
+yfinance
+torch
+matplotlib
+pytorch-forecasting
+numpy
