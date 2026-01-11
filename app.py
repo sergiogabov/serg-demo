@@ -3,42 +3,48 @@ import pandas as pd
 import yfinance as yf
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="BTC Monitor", layout="wide")
-st.title("📊 Мониторинг BTC (Данные Yahoo Finance)")
+st.set_page_config(page_title="BTC Live", layout="wide")
+st.title("📊 Мониторинг котировок BTC")
 
-# 1. Загрузка реальных данных
 @st.cache_data
 def get_data():
-    # Берем данные за последние полгода
-    df = yf.download('BTC-USD', period='6mo', interval='1d')
-    return df
+    # Качаем данные за последние 3 месяца
+    # auto_adjust=True и flat=True лечат ошибку с заголовками
+    data = yf.download('BTC-USD', period='3mo', interval='1d', auto_adjust=True)
+    return data
 
 try:
     df = get_data()
+    
+    # Исправляем проблему MultiIndex (из-за которой вылетает ошибка)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    # Получаем последнюю цену как число
     last_price = float(df['Close'].iloc[-1])
     
-    # 2. Считаем простой скользящий тренд (SMA 20) - это честнее, чем рандом
-    df['SMA20'] = df['Close'].rolling(window=20).mean()
-
-    # 3. Рисуем график
+    # Рисуем график
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # Реальная цена
-    ax.plot(df.index, df['Close'], label='Цена BTC (USD)', color='#1f77b4', lw=2)
+    # Основная линия цены
+    ax.plot(df.index, df['Close'], label='Цена закрытия (USD)', color='#1f77b4', lw=2)
     
-    # Линия тренда (вместо безумного прогноза)
-    ax.plot(df.index, df['SMA20'], label='Линия тренда (SMA 20)', color='#ff7f0e', linestyle='--')
+    # Добавляем простое скользящее среднее для тренда
+    sma = df['Close'].rolling(window=10).mean()
+    ax.plot(df.index, sma, label='Тренд (SMA 10)', color='#ff7f0e', linestyle='--')
 
-    ax.set_title(f"Текущий курс: ${last_price:,.2f}", fontsize=16)
-    ax.grid(True, alpha=0.3)
+    ax.set_title(f"Актуальный курс: ${last_price:,.2f}", fontsize=14)
+    ax.grid(True, alpha=0.2)
     ax.legend()
     
-    # Устанавливаем нормальный масштаб (не в миллионах!)
-    ax.set_ylim(df['Close'].min() * 0.9, df['Close'].max() * 1.1)
+    # Автоматически подбираем масштаб, чтобы график был четким
+    ax.margins(x=0.01, y=0.1)
 
     st.pyplot(fig)
     
-    st.write("Прогноз на 30 дней временно отключен, чтобы не выдавать ошибки. Сейчас на графике — реальный рыночный тренд.")
+    # Выводим цифры крупно
+    st.metric("BTC/USD", f"${last_price:,.2f}")
 
 except Exception as e:
-    st.error(f"Ошибка загрузки данных: {e}")
+    st.error(f"Техническая ошибка: {e}")
+    st.info("Попробуй обновить страницу через минуту.")
