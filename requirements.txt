@@ -6,3 +6,4 @@ matplotlib
 pytorch-forecasting
 numpy
 plotly
+streamlit-autorefresh
