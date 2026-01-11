@@ -5,3 +5,4 @@ torch
 matplotlib
 pytorch-forecasting
 numpy
+plotly
